@@ -502,8 +502,8 @@ export default function Home() {
               background: "#111111",
               border: "1px solid #444",
               borderRadius: 9,
-              padding: 8,
-              marginBottom: 6,
+              padding: 6,
+              marginBottom: 5,
               display: "grid",
               gridTemplateColumns: "1fr auto",
               gap: 6,
@@ -515,7 +515,7 @@ export default function Home() {
               <div
                 style={{
                   minWidth: 108,
-                  padding: "6px 8px",
+                  padding: "4px 8px",
                   background: "#111111",
                   border: "1px solid #444",
                   borderRadius: 7,
@@ -533,7 +533,7 @@ export default function Home() {
                 style={{
                   minWidth: 58,
                   textAlign: "center",
-                  padding: "6px 8px",
+                  padding: "4px 8px",
                   background: "#111111",
                   border: "1px solid #444",
                   borderRadius: 7,
@@ -775,7 +775,7 @@ function PriceButton({
       type="button"
       onClick={onClick}
       style={{
-        height: 92,
+        height: 84,
         borderRadius: 16,
         border: "none",
         background: isSell ? "#d94141" : "#2d6cdf",
@@ -793,7 +793,7 @@ function PriceButton({
       </div>
       <div
         style={{
-          fontSize: 27,
+          fontSize: 32,
           fontWeight: 800,
           textAlign: "right",
           lineHeight: 1,
