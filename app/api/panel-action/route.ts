@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-const LOCAL_SERVER_URL = "http://127.0.0.1:8787/panel-action";
+const LOCAL_SERVER_URL =
+  "https://entered-shortcuts-auto-pension.trycloudflare.com/panel-action";
 
 export async function POST(req: Request) {
   try {
