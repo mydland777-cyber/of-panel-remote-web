@@ -27,6 +27,43 @@ type PanelData = {
   slots: SlotData[];
 };
 
+type BridgeStateSlot = {
+  slot: SlotKey;
+  ok: boolean;
+  ts?: number | null;
+  panel?: string;
+  symbol?: string;
+  tf?: number | null;
+  balance?: number;
+  equity?: number;
+  free?: number;
+  digits?: number | null;
+  bid?: number;
+  ask?: number;
+  spread?: number;
+  spread_points?: number;
+  pos_lots?: number;
+  pos_dir?: number;
+  pips?: number;
+  pl?: number;
+  day_pips?: number;
+  day_profit?: number;
+  acc_ccy?: string;
+  tick_value?: number;
+  tick_size?: number;
+  pip_size?: number;
+  commission_side?: number;
+};
+
+type BridgeStateResponse = {
+  ok: boolean;
+  panel: PanelKey;
+  now: string;
+  slots: BridgeStateSlot[];
+};
+
+type TunnelStatus = "checking" | "ok" | "ng";
+
 const SLOT_SYMBOLS: Record<SlotKey, string> = {
   S1: "USDJPY+",
   S2: "EURJPY+",
@@ -34,133 +71,127 @@ const SLOT_SYMBOLS: Record<SlotKey, string> = {
   S4: "GBPAUD+",
 };
 
-const PANEL_DATA: Record<PanelKey, PanelData> = {
-  A: {
-    title: "[A] O&F Trade Panel",
-    slots: [
-      {
-        id: "S1",
-        symbol: SLOT_SYMBOLS.S1,
-        lot: "0.20",
-        pips: "+5.8",
-        pl: "+12,450",
-        dayPips: "+22.4",
-        dayPl: "+48,200",
-        buyPrice: "143.289",
-        spread: "0.2",
-        sellPrice: "143.287",
-        hasPosition: true,
-        guardOn: true,
-      },
-      {
-        id: "S2",
-        symbol: SLOT_SYMBOLS.S2,
-        lot: "0.20",
-        pips: "",
-        pl: "",
-        dayPips: "+22.4",
-        dayPl: "+48,200",
-        buyPrice: "161.842",
-        spread: "0.3",
-        sellPrice: "161.839",
-        hasPosition: false,
-      },
-      {
-        id: "S3",
-        symbol: SLOT_SYMBOLS.S3,
-        lot: "0.20",
-        pips: "-1.4",
-        pl: "-2,980",
-        dayPips: "+22.4",
-        dayPl: "+48,200",
-        buyPrice: "1.68219",
-        spread: "0.4",
-        sellPrice: "1.68179",
-        hasPosition: true,
-        revCutOn: true,
-      },
-      {
-        id: "S4",
-        symbol: SLOT_SYMBOLS.S4,
-        lot: "0.20",
-        pips: "",
-        pl: "",
-        dayPips: "+22.4",
-        dayPl: "+48,200",
-        buyPrice: "1.94462",
-        spread: "0.5",
-        sellPrice: "1.94412",
-        hasPosition: false,
-      },
-    ],
-  },
-  D: {
-    title: "[D] O&F Trade Panel",
-    slots: [
-      {
-        id: "S1",
-        symbol: SLOT_SYMBOLS.S1,
-        lot: "0.20",
-        pips: "+2.1",
-        pl: "+4,320",
-        dayPips: "+9.1",
-        dayPl: "+18,800",
-        buyPrice: "143.301",
-        spread: "0.2",
-        sellPrice: "143.299",
-        hasPosition: true,
-      },
-      {
-        id: "S2",
-        symbol: SLOT_SYMBOLS.S2,
-        lot: "0.20",
-        pips: "",
-        pl: "",
-        dayPips: "+9.1",
-        dayPl: "+18,800",
-        buyPrice: "161.855",
-        spread: "0.3",
-        sellPrice: "161.852",
-        hasPosition: false,
-      },
-      {
-        id: "S3",
-        symbol: SLOT_SYMBOLS.S3,
-        lot: "0.20",
-        pips: "",
-        pl: "",
-        dayPips: "+9.1",
-        dayPl: "+18,800",
-        buyPrice: "1.68254",
-        spread: "0.4",
-        sellPrice: "1.68214",
-        hasPosition: false,
-      },
-      {
-        id: "S4",
-        symbol: SLOT_SYMBOLS.S4,
-        lot: "0.20",
-        pips: "-0.8",
-        pl: "-1,650",
-        dayPips: "+9.1",
-        dayPl: "+18,800",
-        buyPrice: "1.94488",
-        spread: "0.5",
-        sellPrice: "1.94438",
-        hasPosition: true,
-        tp30On: true,
-      },
-    ],
-  },
+function createEmptyPanelData(panel: PanelKey): PanelData {
+  return {
+    title: `[${panel}] O&F Trade Panel`,
+    slots: (["S1", "S2", "S3", "S4"] as SlotKey[]).map((id) => ({
+      id,
+      symbol: SLOT_SYMBOLS[id],
+      lot: "0.00",
+      pips: "0.0",
+      pl: "0",
+      dayPips: "0.0",
+      dayPl: "0",
+      buyPrice: "0",
+      spread: "0",
+      sellPrice: "0",
+      hasPosition: false,
+      guardOn: false,
+      revCutOn: false,
+      tp30On: false,
+    })),
+  };
+}
+
+const INITIAL_PANEL_DATA: Record<PanelKey, PanelData> = {
+  A: createEmptyPanelData("A"),
+  D: createEmptyPanelData("D"),
 };
 
-type TunnelStatus = "checking" | "ok" | "ng";
+function formatSignedNumber(value: number, digits = 1) {
+  if (!Number.isFinite(value)) return "0";
+  const abs = Math.abs(value).toFixed(digits);
+  if (value > 0) return `+${abs}`;
+  if (value < 0) return `-${abs}`;
+  return Number(0).toFixed(digits);
+}
+
+function formatMoney(value: number) {
+  if (!Number.isFinite(value)) return "0";
+  const abs = Math.abs(Math.round(value)).toLocaleString("ja-JP");
+  if (value > 0) return `+${abs}`;
+  if (value < 0) return `-${abs}`;
+  return "0";
+}
+
+function formatLot(value: number) {
+  if (!Number.isFinite(value)) return "0.00";
+  return value.toFixed(2);
+}
+
+function formatPrice(value: number, digits?: number | null) {
+  if (!Number.isFinite(value)) return "0";
+  if (typeof digits === "number" && digits >= 0) {
+    return value.toFixed(digits);
+  }
+  return String(value);
+}
+
+function formatSpread(value: number, digits?: number | null) {
+  if (!Number.isFinite(value)) return "0";
+  if (typeof digits === "number" && digits >= 4) {
+    return value.toFixed(1);
+  }
+  return value.toFixed(1);
+}
+
+function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateResponse): PanelData {
+  const mappedSlots: SlotData[] = (["S1", "S2", "S3", "S4"] as SlotKey[]).map((slotId) => {
+    const item = response.slots.find((s) => s.slot === slotId);
+
+    if (!item || !item.ok) {
+      return {
+        id: slotId,
+        symbol: SLOT_SYMBOLS[slotId],
+        lot: "0.00",
+        pips: "0.0",
+        pl: "0",
+        dayPips: "0.0",
+        dayPl: "0",
+        buyPrice: "0",
+        spread: "0",
+        sellPrice: "0",
+        hasPosition: false,
+        guardOn: false,
+        revCutOn: false,
+        tp30On: false,
+      };
+    }
+
+    const posLots = Number(item.pos_lots ?? 0);
+    const posDir = Number(item.pos_dir ?? 0);
+    const digits = item.digits ?? null;
+
+    return {
+      id: slotId,
+      symbol: item.symbol || SLOT_SYMBOLS[slotId],
+      lot: formatLot(posLots),
+      pips: formatSignedNumber(Number(item.pips ?? 0), 1),
+      pl: formatMoney(Number(item.pl ?? 0)),
+      dayPips: formatSignedNumber(Number(item.day_pips ?? 0), 1),
+      dayPl: formatMoney(Number(item.day_profit ?? 0)),
+      buyPrice: formatPrice(Number(item.ask ?? 0), digits),
+      spread: formatSpread(Number(item.spread ?? 0), digits),
+      sellPrice: formatPrice(Number(item.bid ?? 0), digits),
+      hasPosition: posDir !== 0 && posLots > 0,
+      guardOn: false,
+      revCutOn: false,
+      tp30On: false,
+    };
+  });
+
+  return {
+    title: `[${panel}] O&F Trade Panel`,
+    slots: mappedSlots,
+  };
+}
 
 export default function Home() {
   const [selectedPanel, setSelectedPanel] = useState<PanelKey>("A");
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("S1");
   const [lastAction, setLastAction] = useState("未操作");
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
+  const [panelDataMap, setPanelDataMap] = useState<Record<PanelKey, PanelData>>(INITIAL_PANEL_DATA);
 
   const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
     entry: null,
@@ -171,7 +202,7 @@ export default function Home() {
     dten: null,
   });
 
-  const panel = useMemo(() => PANEL_DATA[selectedPanel], [selectedPanel]);
+  const panel = useMemo(() => panelDataMap[selectedPanel], [panelDataMap, selectedPanel]);
   const slot = useMemo(() => {
     return panel.slots.find((item) => item.id === selectedSlot) ?? panel.slots[0];
   }, [panel, selectedSlot]);
@@ -194,36 +225,47 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
 
-    async function checkHealth() {
+    async function fetchBridgeState() {
       try {
-        const res = await fetch("/api/panel-action", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            panel: "A",
-            slot: "S1",
-            action: "LOG",
-          }),
+        const res = await fetch(`/api/bridge-state?panel=${selectedPanel}`, {
+          method: "GET",
+          cache: "no-store",
         });
 
+        if (!res.ok) {
+          if (cancelled) return;
+          setTunnelStatus("ng");
+          return;
+        }
+
+        const data = (await res.json()) as BridgeStateResponse;
+
         if (cancelled) return;
-        setTunnelStatus(res.ok ? "ok" : "ng");
+
+        if (!data?.ok || !Array.isArray(data.slots)) {
+          setTunnelStatus("ng");
+          return;
+        }
+
+        setPanelDataMap((prev) => ({
+          ...prev,
+          [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, data),
+        }));
+        setTunnelStatus("ok");
       } catch {
         if (cancelled) return;
         setTunnelStatus("ng");
       }
     }
 
-    checkHealth();
-    const timer = window.setInterval(checkHealth, 10000);
+    fetchBridgeState();
+    const timer = window.setInterval(fetchBridgeState, 3000);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [selectedPanel]);
 
   function playSound(name: keyof typeof audioRef.current) {
     const audio = audioRef.current[name];
@@ -626,8 +668,9 @@ function InfoRow({
   label: string;
   value: string;
 }) {
-  const negative = value.trim().startsWith("-");
-  const positive = value.trim().startsWith("+");
+  const trimmed = value.trim();
+  const negative = trimmed.startsWith("-");
+  const positive = trimmed.startsWith("+");
 
   return (
     <div
