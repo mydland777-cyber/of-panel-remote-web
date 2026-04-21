@@ -27,13 +27,20 @@ type PanelData = {
   slots: SlotData[];
 };
 
+const SLOT_SYMBOLS: Record<SlotKey, string> = {
+  S1: "USDJPY+",
+  S2: "EURJPY+",
+  S3: "EURAUD+",
+  S4: "GBPAUD+",
+};
+
 const PANEL_DATA: Record<PanelKey, PanelData> = {
   A: {
     title: "[A] O&F Trade Panel",
     slots: [
       {
         id: "S1",
-        symbol: "USDJPY+",
+        symbol: SLOT_SYMBOLS.S1,
         lot: "0.20",
         pips: "+5.8",
         pl: "+12,450",
@@ -47,7 +54,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S2",
-        symbol: "EURJPY+",
+        symbol: SLOT_SYMBOLS.S2,
         lot: "0.20",
         pips: "",
         pl: "",
@@ -60,7 +67,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S3",
-        symbol: "EURAUD+",
+        symbol: SLOT_SYMBOLS.S3,
         lot: "0.20",
         pips: "-1.4",
         pl: "-2,980",
@@ -74,7 +81,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S4",
-        symbol: "GBPAUD+",
+        symbol: SLOT_SYMBOLS.S4,
         lot: "0.20",
         pips: "",
         pl: "",
@@ -92,7 +99,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
     slots: [
       {
         id: "S1",
-        symbol: "USDJPY+",
+        symbol: SLOT_SYMBOLS.S1,
         lot: "0.20",
         pips: "+2.1",
         pl: "+4,320",
@@ -105,7 +112,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S2",
-        symbol: "EURJPY+",
+        symbol: SLOT_SYMBOLS.S2,
         lot: "0.20",
         pips: "",
         pl: "",
@@ -118,7 +125,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S3",
-        symbol: "EURAUD+",
+        symbol: SLOT_SYMBOLS.S3,
         lot: "0.20",
         pips: "",
         pl: "",
@@ -131,7 +138,7 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
       },
       {
         id: "S4",
-        symbol: "GBPAUD+",
+        symbol: SLOT_SYMBOLS.S4,
         lot: "0.20",
         pips: "-0.8",
         pl: "-1,650",
