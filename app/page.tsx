@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type PanelKey = "A" | "D";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
 type TunnelStatus = "checking" | "ok" | "ng";
-type ToggleKey = "guardOn" | "revCutOn" | "tp30On";
 
 type SlotData = {
   id: SlotKey;
@@ -55,6 +54,9 @@ type BridgeStateSlot = {
   tick_size?: number;
   pip_size?: number;
   commission_side?: number;
+  guard_on?: boolean;
+  revcut_on?: boolean;
+  tp30_on?: boolean;
 };
 
 type BridgeStateResponse = {
@@ -63,14 +65,6 @@ type BridgeStateResponse = {
   now: string;
   slots: BridgeStateSlot[];
 };
-
-type SlotToggleState = {
-  guardOn: boolean;
-  revCutOn: boolean;
-  tp30On: boolean;
-};
-
-type PanelToggleMap = Record<PanelKey, Record<SlotKey, SlotToggleState>>;
 
 const SLOT_SYMBOLS: Record<SlotKey, string> = {
   S1: "USDJPY+",
@@ -98,18 +92,6 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
       revCutOn: false,
       tp30On: false,
     })),
-  };
-}
-
-function createInitialToggleMap(): PanelToggleMap {
-  const slots = ["S1", "S2", "S3", "S4"] as SlotKey[];
-  return {
-    A: Object.fromEntries(
-      slots.map((slot) => [slot, { guardOn: false, revCutOn: false, tp30On: false }])
-    ) as Record<SlotKey, SlotToggleState>,
-    D: Object.fromEntries(
-      slots.map((slot) => [slot, { guardOn: false, revCutOn: false, tp30On: false }])
-    ) as Record<SlotKey, SlotToggleState>,
   };
 }
 
@@ -193,12 +175,10 @@ function calcDisplayedLotFromState(item: BridgeStateSlot) {
 
 function mapBridgeStateToPanelData(
   panel: PanelKey,
-  response: BridgeStateResponse,
-  toggleMap: PanelToggleMap
+  response: BridgeStateResponse
 ): PanelData {
   const mappedSlots: SlotData[] = (["S1", "S2", "S3", "S4"] as SlotKey[]).map((slotId) => {
     const item = response.slots.find((s) => s.slot === slotId);
-    const toggles = toggleMap[panel][slotId];
 
     if (!item || !item.ok) {
       return {
@@ -236,9 +216,9 @@ function mapBridgeStateToPanelData(
       spread: formatSpread(Number(item.spread ?? 0)),
       sellPrice: formatPrice(Number(item.bid ?? 0), digits),
       hasPosition,
-      guardOn: hasPosition ? toggles.guardOn : false,
-      revCutOn: hasPosition ? toggles.revCutOn : false,
-      tp30On: hasPosition ? toggles.tp30On : false,
+      guardOn: Boolean(item.guard_on),
+      revCutOn: Boolean(item.revcut_on),
+      tp30On: Boolean(item.tp30_on),
     };
   });
 
@@ -262,7 +242,6 @@ export default function Home() {
   const [lastAction, setLastAction] = useState("未操作");
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
   const [panelDataMap, setPanelDataMap] = useState<Record<PanelKey, PanelData>>(INITIAL_PANEL_DATA);
-  const [toggleMap, setToggleMap] = useState<PanelToggleMap>(createInitialToggleMap());
 
   const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
     entry: null,
@@ -359,28 +338,10 @@ export default function Home() {
           return;
         }
 
-        setToggleMap((prev) => {
-          const next = structuredClone(prev) as PanelToggleMap;
-          for (const item of data.slots) {
-            const posLots = Number(item.pos_lots ?? 0);
-            const posDir = Number(item.pos_dir ?? 0);
-            const hasPosition = posDir !== 0 && posLots > 0;
-            if (!hasPosition && next[selectedPanel]?.[item.slot]) {
-              next[selectedPanel][item.slot] = {
-                guardOn: false,
-                revCutOn: false,
-                tp30On: false,
-              };
-            }
-          }
-
-          setPanelDataMap((panelPrev) => ({
-            ...panelPrev,
-            [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, data, next),
-          }));
-
-          return next;
-        });
+        setPanelDataMap((prev) => ({
+          ...prev,
+          [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, data),
+        }));
 
         setTunnelStatus("ok");
       } catch {
@@ -411,29 +372,6 @@ export default function Home() {
     } catch {
       // ignore
     }
-  }
-
-  function setSlotToggle(panelKey: PanelKey, slotKey: SlotKey, key: ToggleKey, value: boolean) {
-    setToggleMap((prev) => ({
-      ...prev,
-      [panelKey]: {
-        ...prev[panelKey],
-        [slotKey]: {
-          ...prev[panelKey][slotKey],
-          [key]: value,
-        },
-      },
-    }));
-
-    setPanelDataMap((prev) => ({
-      ...prev,
-      [panelKey]: {
-        ...prev[panelKey],
-        slots: prev[panelKey].slots.map((s) =>
-          s.id === slotKey ? { ...s, [key]: value } : s
-        ),
-      },
-    }));
   }
 
   function selectPanel(panelKey: PanelKey) {
@@ -490,29 +428,17 @@ export default function Home() {
 
   async function handleRevCutClick() {
     if (!slot.hasPosition) return;
-    const next = !slot.revCutOn;
-    setSlotToggle(selectedPanel, slot.id, "revCutOn", next);
     await sendPanelAction("REV CUT", "REV CUT", "revcut");
   }
 
   async function handleGuardClick() {
     if (!slot.hasPosition) return;
-    const next = !slot.guardOn;
-    setSlotToggle(selectedPanel, slot.id, "guardOn", next);
-    const ok = await sendPanelAction(next ? "BE" : "BE_OFF", "GUARD", "guard");
-    if (!ok) {
-      setSlotToggle(selectedPanel, slot.id, "guardOn", !next);
-    }
+    await sendPanelAction(slot.guardOn ? "BE_OFF" : "BE", "GUARD", "guard");
   }
 
   async function handleTp30Click() {
     if (!slot.hasPosition) return;
-    const next = !slot.tp30On;
-    setSlotToggle(selectedPanel, slot.id, "tp30On", next);
-    const ok = await sendPanelAction(next ? "TP30" : "TP30_OFF", "TP+30", "tp30");
-    if (!ok) {
-      setSlotToggle(selectedPanel, slot.id, "tp30On", !next);
-    }
+    await sendPanelAction(slot.tp30On ? "TP30_OFF" : "TP30", "TP+30", "tp30");
   }
 
   return (
