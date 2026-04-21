@@ -421,9 +421,9 @@ export default function Home() {
                   ? "1px solid #e05a5a"
                   : "1px solid #555555",
             borderRadius: 10,
-            padding: "8px 10px",
-            marginBottom: 6,
-            fontSize: 12,
+            padding: "5px 10px",
+            marginBottom: 5,
+            fontSize: 11,
             fontWeight: 800,
             textAlign: "center",
             color: "#ffffff",
@@ -462,9 +462,9 @@ export default function Home() {
             background: "#2a2a2a",
             border: "1px solid #2b2b2b",
             borderRadius: 12,
-            padding: "9px 10px",
-            marginBottom: 6,
-            fontSize: 16,
+            padding: "5px 10px",
+            marginBottom: 5,
+            fontSize: 14,
             fontWeight: 800,
           }}
         >
@@ -673,12 +673,12 @@ function TopTab({
       type="button"
       onClick={onClick}
       style={{
-        height: 40,
+        height: 34,
         borderRadius: 12,
         border: "1px solid #444",
         background: active ? "#2d6cdf" : "#333333",
         color: "#fff",
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
       }}
