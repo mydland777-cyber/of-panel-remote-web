@@ -601,7 +601,7 @@ export default function Home() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: "1fr",
             gap: 6,
             marginTop: 5,
           }}
@@ -609,10 +609,6 @@ export default function Home() {
           <MiniBottomButton
             label="再計算"
             onClick={() => sendPanelAction("RECALC", "再計算")}
-          />
-          <MiniBottomButton
-            label="LINK"
-            onClick={() => sendPanelAction("LINK", "LINK")}
           />
         </div>
       </div>
