@@ -223,6 +223,8 @@ export default function Home() {
     dten: null,
   });
 
+  const audioUnlockedRef = useRef(false);
+
   const panel = useMemo(() => panelDataMap[selectedPanel], [panelDataMap, selectedPanel]);
   const slot = useMemo(() => {
     return panel.slots.find((item) => item.id === selectedSlot) ?? panel.slots[0];
@@ -239,8 +241,47 @@ export default function Home() {
     Object.values(audioRef.current).forEach((audio) => {
       if (audio) {
         audio.preload = "auto";
+        audio.setAttribute("playsinline", "true");
       }
     });
+  }, []);
+
+  useEffect(() => {
+    const unlockAudio = async () => {
+      if (audioUnlockedRef.current) return;
+
+      const list = Object.values(audioRef.current).filter(Boolean) as HTMLAudioElement[];
+      if (list.length === 0) return;
+
+      audioUnlockedRef.current = true;
+
+      for (const audio of list) {
+        try {
+          audio.muted = true;
+          audio.currentTime = 0;
+          await audio.play();
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+        } catch {
+          audio.muted = false;
+        }
+      }
+    };
+
+    const handler = () => {
+      void unlockAudio();
+    };
+
+    window.addEventListener("touchstart", handler, { passive: true });
+    window.addEventListener("pointerdown", handler, { passive: true });
+    window.addEventListener("click", handler, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handler);
+      window.removeEventListener("pointerdown", handler);
+      window.removeEventListener("click", handler);
+    };
   }, []);
 
   useEffect(() => {
@@ -294,6 +335,8 @@ export default function Home() {
 
     try {
       const cloned = audio.cloneNode(true) as HTMLAudioElement;
+      cloned.preload = "auto";
+      cloned.setAttribute("playsinline", "true");
       cloned.currentTime = 0;
       void cloned.play().catch(() => {});
     } catch {
