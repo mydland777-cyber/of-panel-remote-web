@@ -400,7 +400,7 @@ export default function Home() {
         minHeight: "100dvh",
         background: "#1e1e1e",
         color: "#ffffff",
-        padding: "8px 8px 8px",
+        padding: "10px 8px 12px",
         fontFamily:
           'Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif',
       }}
@@ -421,8 +421,8 @@ export default function Home() {
                   ? "1px solid #e05a5a"
                   : "1px solid #555555",
             borderRadius: 10,
-            padding: "6px 10px",
-            marginBottom: 5,
+            padding: "8px 10px",
+            marginBottom: 6,
             fontSize: 12,
             fontWeight: 800,
             textAlign: "center",
@@ -442,7 +442,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 6,
-            marginBottom: 5,
+            marginBottom: 6,
           }}
         >
           <TopTab
@@ -462,9 +462,9 @@ export default function Home() {
             background: "#2a2a2a",
             border: "1px solid #2b2b2b",
             borderRadius: 12,
-            padding: "7px 10px",
-            marginBottom: 5,
-            fontSize: 15,
+            padding: "9px 10px",
+            marginBottom: 6,
+            fontSize: 16,
             fontWeight: 800,
           }}
         >
@@ -476,7 +476,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr 1fr",
             gap: 6,
-            marginBottom: 5,
+            marginBottom: 6,
           }}
         >
           {panel.slots.map((item) => (
@@ -494,7 +494,7 @@ export default function Home() {
             background: "#2a2a2a",
             border: "1px solid #2b2b2b",
             borderRadius: 12,
-            padding: 7,
+            padding: 8,
           }}
         >
           <div
@@ -502,8 +502,8 @@ export default function Home() {
               background: "#111111",
               border: "1px solid #444",
               borderRadius: 9,
-              padding: 6,
-              marginBottom: 5,
+              padding: 8,
+              marginBottom: 6,
               display: "grid",
               gridTemplateColumns: "1fr auto",
               gap: 6,
@@ -511,16 +511,16 @@ export default function Home() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ fontWeight: 800, fontSize: 14 }}>{slot.id}</div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>{slot.id}</div>
               <div
                 style={{
                   minWidth: 108,
-                  padding: "4px 7px",
+                  padding: "6px 8px",
                   background: "#111111",
                   border: "1px solid #444",
                   borderRadius: 7,
                   fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 15,
                 }}
               >
                 {slot.symbol}
@@ -528,17 +528,17 @@ export default function Home() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ opacity: 0.9, fontSize: 13 }}>Lot</div>
+              <div style={{ opacity: 0.9, fontSize: 14 }}>Lot</div>
               <div
                 style={{
-                  minWidth: 54,
+                  minWidth: 58,
                   textAlign: "center",
-                  padding: "4px 7px",
+                  padding: "6px 8px",
                   background: "#111111",
                   border: "1px solid #444",
                   borderRadius: 7,
                   fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 15,
                 }}
               >
                 {slot.lot}
@@ -554,9 +554,9 @@ export default function Home() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 52px 1fr",
+              gridTemplateColumns: "1fr 56px 1fr",
               gap: 6,
-              marginBottom: 5,
+              marginBottom: 6,
             }}
           >
             <PriceButton
@@ -577,7 +577,7 @@ export default function Home() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 6,
-              marginBottom: 5,
+              marginBottom: 6,
             }}
           >
             <ActionButton
@@ -600,7 +600,7 @@ export default function Home() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 6,
-              marginBottom: 5,
+              marginBottom: 6,
             }}
           >
             <ActionButton
@@ -631,8 +631,8 @@ export default function Home() {
             background: "#2a2a2a",
             border: "1px solid #2b2b2b",
             borderRadius: 10,
-            padding: "7px 10px",
-            marginTop: 5,
+            padding: "9px 10px",
+            marginTop: 6,
             fontSize: 12,
             fontWeight: 700,
             color: "#d1d5db",
@@ -646,7 +646,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "1fr",
             gap: 6,
-            marginTop: 5,
+            marginTop: 6,
           }}
         >
           <MiniBottomButton
@@ -673,12 +673,12 @@ function TopTab({
       type="button"
       onClick={onClick}
       style={{
-        height: 36,
+        height: 40,
         borderRadius: 12,
         border: "1px solid #444",
         background: active ? "#2d6cdf" : "#333333",
         color: "#fff",
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
       }}
@@ -702,12 +702,12 @@ function MiniSelectButton({
       type="button"
       onClick={onClick}
       style={{
-        height: 32,
+        height: 36,
         borderRadius: 10,
         border: "1px solid #444",
         background: active ? "#2563eb" : "#333333",
         color: "#fff",
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 800,
         padding: "0 4px",
         WebkitTapHighlightColor: "transparent",
@@ -735,19 +735,19 @@ function InfoRow({
         background: "#1f1f1f",
         border: "1px solid #444",
         borderRadius: 9,
-        padding: "6px 9px",
-        marginBottom: 5,
+        padding: "10px 10px",
+        marginBottom: 6,
         display: "grid",
         gridTemplateColumns: "auto 1fr",
         gap: 8,
         alignItems: "center",
       }}
     >
-      <div style={{ opacity: 0.8, fontSize: 12 }}>{label}</div>
+      <div style={{ opacity: 0.8, fontSize: 13 }}>{label}</div>
       <div
         style={{
           textAlign: "right",
-          fontSize: 17,
+          fontSize: 19,
           fontWeight: 800,
           color: positive ? "#a8d8ff" : negative ? "#ffb0b0" : "#ffffff",
           lineHeight: 1,
@@ -775,12 +775,12 @@ function PriceButton({
       type="button"
       onClick={onClick}
       style={{
-        height: 70,
+        height: 92,
         borderRadius: 16,
         border: "none",
         background: isSell ? "#d94141" : "#2d6cdf",
         color: "#fff",
-        padding: 7,
+        padding: 9,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -788,12 +788,12 @@ function PriceButton({
         WebkitTapHighlightColor: "transparent",
       }}
     >
-      <div style={{ fontSize: 17, fontWeight: 800, textAlign: "left" }}>
+      <div style={{ fontSize: 18, fontWeight: 800, textAlign: "left" }}>
         {side}
       </div>
       <div
         style={{
-          fontSize: 21,
+          fontSize: 27,
           fontWeight: 800,
           textAlign: "right",
           lineHeight: 1,
@@ -809,22 +809,22 @@ function SpreadBox({ spread }: { spread: string }) {
   return (
     <div
       style={{
-        height: 36,
+        height: 42,
         alignSelf: "center",
         borderRadius: 9,
         border: "1px solid #444",
         background: "#111111",
-        padding: 4,
+        padding: 5,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      <div style={{ fontSize: 9, opacity: 0.8, lineHeight: 1 }}>SPR</div>
+      <div style={{ fontSize: 10, opacity: 0.8, lineHeight: 1 }}>SPR</div>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 800,
           color: "gold",
           lineHeight: 1.1,
@@ -877,12 +877,12 @@ function ActionButton({
       onClick={onClick}
       style={{
         width: fullWidth ? "100%" : undefined,
-        height: close ? 44 : 38,
+        height: close ? 56 : 46,
         borderRadius: 16,
         border: "none",
         background,
         color: disabled ? "rgba(255,255,255,0.35)" : color,
-        fontSize: close ? 18 : 14,
+        fontSize: close ? 20 : 15,
         fontWeight: 800,
         opacity: disabled ? 0.35 : 1,
         WebkitTapHighlightColor: "transparent",
@@ -905,12 +905,12 @@ function MiniBottomButton({
       type="button"
       onClick={onClick}
       style={{
-        height: 32,
+        height: 40,
         borderRadius: 12,
         border: "1px solid #444",
         background: "#333333",
         color: "#ffffff",
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
       }}
