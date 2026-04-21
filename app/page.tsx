@@ -830,7 +830,7 @@ function PriceButton({
             fontSize: 16,
             lineHeight: 1,
             position: "relative",
-            top: -10,
+            top: -12,
             marginLeft: 1,
             display: "inline-block",
           }}
