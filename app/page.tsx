@@ -421,7 +421,7 @@ export default function Home() {
                   ? "1px solid #e05a5a"
                   : "1px solid #555555",
             borderRadius: 10,
-            padding: "5px 10px",
+            padding: "2px 10px",
             marginBottom: 3,
             fontSize: 10,
             fontWeight: 800,
@@ -673,7 +673,7 @@ function TopTab({
       type="button"
       onClick={onClick}
       style={{
-        height: 30,
+        height: 27,
         borderRadius: 12,
         border: "1px solid #444",
         background: active ? "#2d6cdf" : "#333333",
