@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type PanelKey = "A" | "D";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
@@ -154,18 +154,42 @@ const PANEL_DATA: Record<PanelKey, PanelData> = {
   },
 };
 
+type TunnelStatus = "checking" | "ok" | "ng";
+
 export default function Home() {
   const [selectedPanel, setSelectedPanel] = useState<PanelKey>("A");
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("S1");
   const [lastAction, setLastAction] = useState("未操作");
-  const [tunnelStatus, setTunnelStatus] = useState<"checking" | "ok" | "ng">(
-    "checking"
-  );
+  const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
+
+  const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
+    entry: null,
+    entry_failed: null,
+    guard: null,
+    revcut: null,
+    tp30: null,
+    dten: null,
+  });
 
   const panel = useMemo(() => PANEL_DATA[selectedPanel], [selectedPanel]);
   const slot = useMemo(() => {
     return panel.slots.find((item) => item.id === selectedSlot) ?? panel.slots[0];
   }, [panel, selectedSlot]);
+
+  useEffect(() => {
+    audioRef.current.entry = new Audio("/entry.wav");
+    audioRef.current.entry_failed = new Audio("/entry_failed.wav");
+    audioRef.current.guard = new Audio("/guard.wav");
+    audioRef.current.revcut = new Audio("/revcut.wav");
+    audioRef.current.tp30 = new Audio("/tp30.wav");
+    audioRef.current.dten = new Audio("/dten.wav");
+
+    Object.values(audioRef.current).forEach((audio) => {
+      if (audio) {
+        audio.preload = "auto";
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,6 +225,18 @@ export default function Home() {
     };
   }, []);
 
+  function playSound(name: keyof typeof audioRef.current) {
+    const audio = audioRef.current[name];
+    if (!audio) return;
+
+    try {
+      audio.currentTime = 0;
+      void audio.play();
+    } catch {
+      // iPhoneの再生制限がある場合は無視
+    }
+  }
+
   function selectPanel(panelKey: PanelKey) {
     setSelectedPanel(panelKey);
     setSelectedSlot("S1");
@@ -212,8 +248,16 @@ export default function Home() {
     setLastAction(`Panel ${selectedPanel} / ${slotId} を選択`);
   }
 
-  async function sendPanelAction(action: string, label: string) {
+  async function sendPanelAction(
+    action: string,
+    label: string,
+    sound?: keyof typeof audioRef.current
+  ) {
     setLastAction(`送信中: Panel ${selectedPanel} / ${slot.id} / ${label}`);
+
+    if (sound) {
+      playSound(sound);
+    }
 
     try {
       const res = await fetch("/api/panel-action", {
@@ -231,12 +275,14 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok || !data?.ok) {
+        playSound("entry_failed");
         setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${label}`);
         return;
       }
 
       setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${label}`);
     } catch {
+      playSound("entry_failed");
       setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${label}`);
     }
   }
@@ -409,13 +455,13 @@ export default function Home() {
             <PriceButton
               side="SELL"
               price={slot.sellPrice}
-              onClick={() => sendPanelAction("SELL", "SELL")}
+              onClick={() => sendPanelAction("SELL", "SELL", "entry")}
             />
             <SpreadBox spread={slot.spread} />
             <PriceButton
               side="BUY"
               price={slot.buyPrice}
-              onClick={() => sendPanelAction("BUY", "BUY")}
+              onClick={() => sendPanelAction("BUY", "BUY", "entry")}
             />
           </div>
 
@@ -431,14 +477,14 @@ export default function Home() {
               label="REV CUT"
               onState={slot.revCutOn}
               disabled={!slot.hasPosition}
-              onClick={() => sendPanelAction("REV CUT", "REV CUT")}
+              onClick={() => sendPanelAction("REV CUT", "REV CUT", "revcut")}
             />
             <ActionButton
               label="GUARD"
               onState={slot.guardOn}
               disabled={!slot.hasPosition}
               purple
-              onClick={() => sendPanelAction("BE", "GUARD")}
+              onClick={() => sendPanelAction("BE", "GUARD", "guard")}
             />
           </div>
 
@@ -455,13 +501,13 @@ export default function Home() {
               onState={slot.tp30On}
               disabled={!slot.hasPosition}
               gold
-              onClick={() => sendPanelAction("TP30", "TP+30")}
+              onClick={() => sendPanelAction("TP30", "TP+30", "tp30")}
             />
             <ActionButton
               label="D-TEN"
               disabled={!slot.hasPosition}
               purple
-              onClick={() => sendPanelAction("DTEN", "D-TEN")}
+              onClick={() => sendPanelAction("DTEN", "D-TEN", "dten")}
             />
           </div>
 
