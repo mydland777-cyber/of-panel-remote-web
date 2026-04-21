@@ -463,8 +463,8 @@ export default function Home() {
             border: "1px solid #2b2b2b",
             borderRadius: 12,
             padding: "5px 10px",
-            marginBottom: 5,
-            fontSize: 14,
+            marginBottom: 3,
+            fontSize: 12,
             fontWeight: 800,
           }}
         >
