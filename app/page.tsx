@@ -168,8 +168,8 @@ export default function Home() {
     setLastAction(`Panel ${selectedPanel} / ${slotId} を選択`);
   }
 
-  async function handleAction(action: string) {
-    setLastAction(`送信中: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+  async function sendPanelAction(action: string, label: string) {
+    setLastAction(`送信中: Panel ${selectedPanel} / ${slot.id} / ${label}`);
 
     try {
       const res = await fetch("/api/panel-action", {
@@ -187,13 +187,13 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok || !data?.ok) {
-        setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+        setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${label}`);
         return;
       }
 
-      setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${data.action}`);
+      setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${label}`);
     } catch {
-      setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+      setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${label}`);
     }
   }
 
@@ -334,13 +334,13 @@ export default function Home() {
             <PriceButton
               side="SELL"
               price={slot.sellPrice}
-              onClick={() => handleAction("SELL")}
+              onClick={() => sendPanelAction("SELL", "SELL")}
             />
             <SpreadBox spread={slot.spread} />
             <PriceButton
               side="BUY"
               price={slot.buyPrice}
-              onClick={() => handleAction("BUY")}
+              onClick={() => sendPanelAction("BUY", "BUY")}
             />
           </div>
 
@@ -356,14 +356,14 @@ export default function Home() {
               label="REV CUT"
               onState={slot.revCutOn}
               disabled={!slot.hasPosition}
-              onClick={() => handleAction("REV CUT")}
+              onClick={() => sendPanelAction("REV CUT", "REV CUT")}
             />
             <ActionButton
               label="GUARD"
               onState={slot.guardOn}
               disabled={!slot.hasPosition}
               purple
-              onClick={() => handleAction("GUARD")}
+              onClick={() => sendPanelAction("BE", "GUARD")}
             />
           </div>
 
@@ -380,13 +380,13 @@ export default function Home() {
               onState={slot.tp30On}
               disabled={!slot.hasPosition}
               gold
-              onClick={() => handleAction("TP+30")}
+              onClick={() => sendPanelAction("TP30", "TP+30")}
             />
             <ActionButton
               label="D-TEN"
               disabled={!slot.hasPosition}
               purple
-              onClick={() => handleAction("D-TEN")}
+              onClick={() => sendPanelAction("DTEN", "D-TEN")}
             />
           </div>
 
@@ -394,7 +394,7 @@ export default function Home() {
             label="CLOSE"
             close
             fullWidth
-            onClick={() => handleAction("CLOSE")}
+            onClick={() => sendPanelAction("CLOSE", "CLOSE")}
           />
         </div>
 
@@ -421,9 +421,18 @@ export default function Home() {
             marginTop: 5,
           }}
         >
-          <MiniBottomButton label="再計算" onClick={() => handleAction("再計算")} />
-          <MiniBottomButton label="LINK" onClick={() => handleAction("LINK")} />
-          <MiniBottomButton label="LOG" onClick={() => handleAction("LOG")} />
+          <MiniBottomButton
+            label="再計算"
+            onClick={() => sendPanelAction("RECALC", "再計算")}
+          />
+          <MiniBottomButton
+            label="LINK"
+            onClick={() => sendPanelAction("LINK", "LINK")}
+          />
+          <MiniBottomButton
+            label="LOG"
+            onClick={() => sendPanelAction("LOG", "LOG")}
+          />
         </div>
       </div>
     </main>
