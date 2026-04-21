@@ -168,8 +168,33 @@ export default function Home() {
     setLastAction(`Panel ${selectedPanel} / ${slotId} を選択`);
   }
 
-  function handleAction(action: string) {
-    setLastAction(`Panel ${selectedPanel} / ${slot.id} / ${action}`);
+  async function handleAction(action: string) {
+    setLastAction(`送信中: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+
+    try {
+      const res = await fetch("/api/panel-action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          panel: selectedPanel,
+          slot: slot.id,
+          action,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok) {
+        setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+        return;
+      }
+
+      setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${data.action}`);
+    } catch {
+      setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${action}`);
+    }
   }
 
   return (
