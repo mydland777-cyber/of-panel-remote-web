@@ -140,6 +140,22 @@ function formatSpread(value: number) {
   return value.toFixed(1);
 }
 
+function splitPriceForDisplay(price: string) {
+  const text = String(price || "").trim();
+  if (!text) {
+    return { main: "0", last: "" };
+  }
+
+  if (text.length <= 1) {
+    return { main: text, last: "" };
+  }
+
+  return {
+    main: text.slice(0, -1),
+    last: text.slice(-1),
+  };
+}
+
 function calcDisplayedLotFromState(item: BridgeStateSlot) {
   const free = Number(item.free ?? 0);
   const balance = Number(item.balance ?? 0);
@@ -769,6 +785,7 @@ function PriceButton({
   onClick: () => void;
 }) {
   const isSell = side === "SELL";
+  const { main, last } = splitPriceForDisplay(price);
 
   return (
     <button
@@ -791,15 +808,35 @@ function PriceButton({
       <div style={{ fontSize: 18, fontWeight: 800, textAlign: "left" }}>
         {side}
       </div>
+
       <div
         style={{
-          fontSize: 32,
-          fontWeight: 800,
           textAlign: "right",
           lineHeight: 1,
+          fontWeight: 800,
+          whiteSpace: "nowrap",
         }}
       >
-        {price}
+        <span
+          style={{
+            fontSize: 32,
+            lineHeight: 1,
+          }}
+        >
+          {main}
+        </span>
+        <span
+          style={{
+            fontSize: 16,
+            lineHeight: 1,
+            position: "relative",
+            top: -10,
+            marginLeft: 1,
+            display: "inline-block",
+          }}
+        >
+          {last}
+        </span>
       </div>
     </button>
   );
