@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type PanelKey = "A" | "D";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
@@ -158,11 +158,48 @@ export default function Home() {
   const [selectedPanel, setSelectedPanel] = useState<PanelKey>("A");
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("S1");
   const [lastAction, setLastAction] = useState("未操作");
+  const [tunnelStatus, setTunnelStatus] = useState<"checking" | "ok" | "ng">(
+    "checking"
+  );
 
   const panel = useMemo(() => PANEL_DATA[selectedPanel], [selectedPanel]);
   const slot = useMemo(() => {
     return panel.slots.find((item) => item.id === selectedSlot) ?? panel.slots[0];
   }, [panel, selectedSlot]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkHealth() {
+      try {
+        const res = await fetch("/api/panel-action", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            panel: "A",
+            slot: "S1",
+            action: "LOG",
+          }),
+        });
+
+        if (cancelled) return;
+        setTunnelStatus(res.ok ? "ok" : "ng");
+      } catch {
+        if (cancelled) return;
+        setTunnelStatus("ng");
+      }
+    }
+
+    checkHealth();
+    const timer = window.setInterval(checkHealth, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   function selectPanel(panelKey: PanelKey) {
     setSelectedPanel(panelKey);
@@ -216,6 +253,37 @@ export default function Home() {
       }}
     >
       <div style={{ maxWidth: 430, margin: "0 auto" }}>
+        <div
+          style={{
+            background:
+              tunnelStatus === "ok"
+                ? "#16351f"
+                : tunnelStatus === "ng"
+                  ? "#4a1717"
+                  : "#333333",
+            border:
+              tunnelStatus === "ok"
+                ? "1px solid #2fbf71"
+                : tunnelStatus === "ng"
+                  ? "1px solid #e05a5a"
+                  : "1px solid #555555",
+            borderRadius: 10,
+            padding: "6px 10px",
+            marginBottom: 5,
+            fontSize: 12,
+            fontWeight: 800,
+            textAlign: "center",
+            color: "#ffffff",
+          }}
+        >
+          CONNECTION:{" "}
+          {tunnelStatus === "ok"
+            ? "OK"
+            : tunnelStatus === "ng"
+              ? "NG"
+              : "CHECKING"}
+        </div>
+
         <div
           style={{
             display: "grid",
