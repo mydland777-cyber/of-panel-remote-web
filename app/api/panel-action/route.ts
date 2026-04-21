@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 
-const LOCAL_SERVER_URL =
-  "https://entered-shortcuts-auto-pension.trycloudflare.com/panel-action";
-
 export async function POST(req: Request) {
   try {
+    const tunnelBaseUrl = process.env.PANEL_TUNNEL_URL;
+
+    if (!tunnelBaseUrl) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "PANEL_TUNNEL_URL is not set",
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
 
     const panel = String(body?.panel ?? "").trim().toUpperCase();
@@ -21,7 +30,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const upstream = await fetch(LOCAL_SERVER_URL, {
+    const upstream = await fetch(`${tunnelBaseUrl}/panel-action`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
