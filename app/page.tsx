@@ -673,12 +673,12 @@ function TopTab({
       type="button"
       onClick={onClick}
       style={{
-        height: 34,
+        height: 30,
         borderRadius: 12,
         border: "1px solid #444",
         background: active ? "#2d6cdf" : "#333333",
         color: "#fff",
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
       }}
