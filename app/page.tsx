@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type PanelKey = "A" | "D";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
 type TunnelStatus = "checking" | "ok" | "ng";
+type ToggleKey = "guardOn" | "revCutOn" | "tp30On";
 
 type SlotData = {
   id: SlotKey;
@@ -18,9 +19,9 @@ type SlotData = {
   spread: string;
   sellPrice: string;
   hasPosition: boolean;
-  guardOn?: boolean;
-  revCutOn?: boolean;
-  tp30On?: boolean;
+  guardOn: boolean;
+  revCutOn: boolean;
+  tp30On: boolean;
 };
 
 type PanelData = {
@@ -63,6 +64,14 @@ type BridgeStateResponse = {
   slots: BridgeStateSlot[];
 };
 
+type SlotToggleState = {
+  guardOn: boolean;
+  revCutOn: boolean;
+  tp30On: boolean;
+};
+
+type PanelToggleMap = Record<PanelKey, Record<SlotKey, SlotToggleState>>;
+
 const SLOT_SYMBOLS: Record<SlotKey, string> = {
   S1: "USDJPY+",
   S2: "EURJPY+",
@@ -89,6 +98,18 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
       revCutOn: false,
       tp30On: false,
     })),
+  };
+}
+
+function createInitialToggleMap(): PanelToggleMap {
+  const slots = ["S1", "S2", "S3", "S4"] as SlotKey[];
+  return {
+    A: Object.fromEntries(
+      slots.map((slot) => [slot, { guardOn: false, revCutOn: false, tp30On: false }])
+    ) as Record<SlotKey, SlotToggleState>,
+    D: Object.fromEntries(
+      slots.map((slot) => [slot, { guardOn: false, revCutOn: false, tp30On: false }])
+    ) as Record<SlotKey, SlotToggleState>,
   };
 }
 
@@ -145,11 +166,9 @@ function splitPriceForDisplay(price: string) {
   if (!text) {
     return { main: "0", last: "" };
   }
-
   if (text.length <= 1) {
     return { main: text, last: "" };
   }
-
   return {
     main: text.slice(0, -1),
     last: text.slice(-1),
@@ -172,9 +191,14 @@ function calcDisplayedLotFromState(item: BridgeStateSlot) {
   return formatLot(Number(lots.toFixed(2)));
 }
 
-function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateResponse): PanelData {
+function mapBridgeStateToPanelData(
+  panel: PanelKey,
+  response: BridgeStateResponse,
+  toggleMap: PanelToggleMap
+): PanelData {
   const mappedSlots: SlotData[] = (["S1", "S2", "S3", "S4"] as SlotKey[]).map((slotId) => {
     const item = response.slots.find((s) => s.slot === slotId);
+    const toggles = toggleMap[panel][slotId];
 
     if (!item || !item.ok) {
       return {
@@ -198,6 +222,7 @@ function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateRespons
     const posLots = Number(item.pos_lots ?? 0);
     const posDir = Number(item.pos_dir ?? 0);
     const digits = item.digits ?? null;
+    const hasPosition = posDir !== 0 && posLots > 0;
 
     return {
       id: slotId,
@@ -210,10 +235,10 @@ function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateRespons
       buyPrice: formatPrice(Number(item.ask ?? 0), digits),
       spread: formatSpread(Number(item.spread ?? 0)),
       sellPrice: formatPrice(Number(item.bid ?? 0), digits),
-      hasPosition: posDir !== 0 && posLots > 0,
-      guardOn: false,
-      revCutOn: false,
-      tp30On: false,
+      hasPosition,
+      guardOn: hasPosition ? toggles.guardOn : false,
+      revCutOn: hasPosition ? toggles.revCutOn : false,
+      tp30On: hasPosition ? toggles.tp30On : false,
     };
   });
 
@@ -223,12 +248,21 @@ function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateRespons
   };
 }
 
+function getPressStyle(pressed: boolean, disabled = false) {
+  return {
+    opacity: disabled ? 0.35 : pressed ? 0.85 : 1,
+    transform: pressed ? "scale(0.98)" : "scale(1)",
+    transition: "transform 0.06s ease, opacity 0.06s ease",
+  };
+}
+
 export default function Home() {
   const [selectedPanel, setSelectedPanel] = useState<PanelKey>("A");
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("S1");
   const [lastAction, setLastAction] = useState("未操作");
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
   const [panelDataMap, setPanelDataMap] = useState<Record<PanelKey, PanelData>>(INITIAL_PANEL_DATA);
+  const [toggleMap, setToggleMap] = useState<PanelToggleMap>(createInitialToggleMap());
 
   const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
     entry: null,
@@ -325,10 +359,29 @@ export default function Home() {
           return;
         }
 
-        setPanelDataMap((prev) => ({
-          ...prev,
-          [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, data),
-        }));
+        setToggleMap((prev) => {
+          const next = structuredClone(prev) as PanelToggleMap;
+          for (const item of data.slots) {
+            const posLots = Number(item.pos_lots ?? 0);
+            const posDir = Number(item.pos_dir ?? 0);
+            const hasPosition = posDir !== 0 && posLots > 0;
+            if (!hasPosition && next[selectedPanel]?.[item.slot]) {
+              next[selectedPanel][item.slot] = {
+                guardOn: false,
+                revCutOn: false,
+                tp30On: false,
+              };
+            }
+          }
+
+          setPanelDataMap((panelPrev) => ({
+            ...panelPrev,
+            [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, data, next),
+          }));
+
+          return next;
+        });
+
         setTunnelStatus("ok");
       } catch {
         if (cancelled) return;
@@ -358,6 +411,29 @@ export default function Home() {
     } catch {
       // ignore
     }
+  }
+
+  function setSlotToggle(panelKey: PanelKey, slotKey: SlotKey, key: ToggleKey, value: boolean) {
+    setToggleMap((prev) => ({
+      ...prev,
+      [panelKey]: {
+        ...prev[panelKey],
+        [slotKey]: {
+          ...prev[panelKey][slotKey],
+          [key]: value,
+        },
+      },
+    }));
+
+    setPanelDataMap((prev) => ({
+      ...prev,
+      [panelKey]: {
+        ...prev[panelKey],
+        slots: prev[panelKey].slots.map((s) =>
+          s.id === slotKey ? { ...s, [key]: value } : s
+        ),
+      },
+    }));
   }
 
   function selectPanel(panelKey: PanelKey) {
@@ -400,13 +476,42 @@ export default function Home() {
       if (!res.ok || !data?.ok) {
         playSound("entry_failed");
         setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${label}`);
-        return;
+        return false;
       }
 
       setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${label}`);
+      return true;
     } catch {
       playSound("entry_failed");
       setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${label}`);
+      return false;
+    }
+  }
+
+  async function handleRevCutClick() {
+    if (!slot.hasPosition) return;
+    const next = !slot.revCutOn;
+    setSlotToggle(selectedPanel, slot.id, "revCutOn", next);
+    await sendPanelAction("REV CUT", "REV CUT", "revcut");
+  }
+
+  async function handleGuardClick() {
+    if (!slot.hasPosition) return;
+    const next = !slot.guardOn;
+    setSlotToggle(selectedPanel, slot.id, "guardOn", next);
+    const ok = await sendPanelAction(next ? "BE" : "BE_OFF", "GUARD", "guard");
+    if (!ok) {
+      setSlotToggle(selectedPanel, slot.id, "guardOn", !next);
+    }
+  }
+
+  async function handleTp30Click() {
+    if (!slot.hasPosition) return;
+    const next = !slot.tp30On;
+    setSlotToggle(selectedPanel, slot.id, "tp30On", next);
+    const ok = await sendPanelAction(next ? "TP30" : "TP30_OFF", "TP+30", "tp30");
+    if (!ok) {
+      setSlotToggle(selectedPanel, slot.id, "tp30On", !next);
     }
   }
 
@@ -437,7 +542,7 @@ export default function Home() {
                   ? "1px solid #e05a5a"
                   : "1px solid #555555",
             borderRadius: 10,
-            padding: "2px 10px",
+            padding: "5px 10px",
             marginBottom: 3,
             fontSize: 10,
             fontWeight: 800,
@@ -458,7 +563,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 6,
-            marginBottom: 6,
+            marginBottom: 3,
           }}
         >
           <TopTab
@@ -479,8 +584,8 @@ export default function Home() {
             border: "1px solid #2b2b2b",
             borderRadius: 12,
             padding: "5px 10px",
-            marginBottom: 3,
-            fontSize: 12,
+            marginBottom: 5,
+            fontSize: 14,
             fontWeight: 800,
           }}
         >
@@ -492,7 +597,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr 1fr",
             gap: 6,
-            marginBottom: 6,
+            marginBottom: 5,
           }}
         >
           {panel.slots.map((item) => (
@@ -510,7 +615,7 @@ export default function Home() {
             background: "#2a2a2a",
             border: "1px solid #2b2b2b",
             borderRadius: 12,
-            padding: 8,
+            padding: 7,
           }}
         >
           <div
@@ -527,7 +632,7 @@ export default function Home() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{slot.id}</div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>{slot.id}</div>
               <div
                 style={{
                   minWidth: 108,
@@ -544,7 +649,7 @@ export default function Home() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ opacity: 0.9, fontSize: 14 }}>Lot</div>
+              <div style={{ opacity: 0.9, fontSize: 13 }}>Lot</div>
               <div
                 style={{
                   minWidth: 58,
@@ -572,19 +677,23 @@ export default function Home() {
               display: "grid",
               gridTemplateColumns: "1fr 56px 1fr",
               gap: 6,
-              marginBottom: 6,
+              marginBottom: 5,
             }}
           >
             <PriceButton
               side="SELL"
               price={slot.sellPrice}
-              onClick={() => sendPanelAction("SELL", "SELL", "entry")}
+              onClick={() => {
+                void sendPanelAction("SELL", "SELL", "entry");
+              }}
             />
             <SpreadBox spread={slot.spread} />
             <PriceButton
               side="BUY"
               price={slot.buyPrice}
-              onClick={() => sendPanelAction("BUY", "BUY", "entry")}
+              onClick={() => {
+                void sendPanelAction("BUY", "BUY", "entry");
+              }}
             />
           </div>
 
@@ -593,21 +702,24 @@ export default function Home() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 6,
-              marginBottom: 6,
+              marginBottom: 5,
             }}
           >
             <ActionButton
               label="REV CUT"
-              onState={slot.revCutOn}
+              variant={slot.revCutOn ? "on" : "off"}
               disabled={!slot.hasPosition}
-              onClick={() => sendPanelAction("REV CUT", "REV CUT", "revcut")}
+              onClick={() => {
+                void handleRevCutClick();
+              }}
             />
             <ActionButton
               label="GUARD"
-              onState={slot.guardOn}
+              variant={slot.guardOn ? "on" : "off"}
               disabled={!slot.hasPosition}
-              purple
-              onClick={() => sendPanelAction("BE", "GUARD", "guard")}
+              onClick={() => {
+                void handleGuardClick();
+              }}
             />
           </div>
 
@@ -616,29 +728,34 @@ export default function Home() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 6,
-              marginBottom: 6,
+              marginBottom: 5,
             }}
           >
             <ActionButton
               label="TP+30"
-              onState={slot.tp30On}
+              variant={slot.tp30On ? "on" : "tpOff"}
               disabled={!slot.hasPosition}
-              gold
-              onClick={() => sendPanelAction("TP30", "TP+30", "tp30")}
+              onClick={() => {
+                void handleTp30Click();
+              }}
             />
             <ActionButton
               label="D-TEN"
+              variant="dten"
               disabled={!slot.hasPosition}
-              purple
-              onClick={() => sendPanelAction("DTEN", "D-TEN", "dten")}
+              onClick={() => {
+                void sendPanelAction("DTEN", "D-TEN", "dten");
+              }}
             />
           </div>
 
           <ActionButton
             label="CLOSE"
-            close
+            variant="close"
             fullWidth
-            onClick={() => sendPanelAction("CLOSE", "CLOSE")}
+            onClick={() => {
+              void sendPanelAction("CLOSE", "CLOSE");
+            }}
           />
         </div>
 
@@ -667,7 +784,9 @@ export default function Home() {
         >
           <MiniBottomButton
             label="再計算"
-            onClick={() => sendPanelAction("RECALC", "再計算")}
+            onClick={() => {
+              void sendPanelAction("RECALC", "再計算");
+            }}
           />
         </div>
       </div>
@@ -684,12 +803,18 @@ function TopTab({
   active: boolean;
   onClick: () => void;
 }) {
+  const [pressed, setPressed] = useState(false);
+
   return (
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
-        height: 27,
+        height: 30,
         borderRadius: 12,
         border: "1px solid #444",
         background: active ? "#2d6cdf" : "#333333",
@@ -697,6 +822,7 @@ function TopTab({
         fontSize: 13,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
+        ...getPressStyle(pressed, false),
       }}
     >
       {label}
@@ -713,10 +839,16 @@ function MiniSelectButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const [pressed, setPressed] = useState(false);
+
   return (
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         height: 36,
         borderRadius: 10,
@@ -727,6 +859,7 @@ function MiniSelectButton({
         fontWeight: 800,
         padding: "0 4px",
         WebkitTapHighlightColor: "transparent",
+        ...getPressStyle(pressed, false),
       }}
     >
       {label}
@@ -751,8 +884,8 @@ function InfoRow({
         background: "#1f1f1f",
         border: "1px solid #444",
         borderRadius: 9,
-        padding: "10px 10px",
-        marginBottom: 6,
+        padding: "8px 10px",
+        marginBottom: 5,
         display: "grid",
         gridTemplateColumns: "auto 1fr",
         gap: 8,
@@ -763,9 +896,9 @@ function InfoRow({
       <div
         style={{
           textAlign: "right",
-          fontSize: 19,
+          fontSize: 18,
           fontWeight: 800,
-          color: positive ? "#a8d8ff" : negative ? "#ffb0b0" : "#ffffff",
+          color: positive ? "#A8D8FF" : negative ? "#FFB0B0" : "#ffffff",
           lineHeight: 1,
         }}
       >
@@ -786,26 +919,32 @@ function PriceButton({
 }) {
   const isSell = side === "SELL";
   const { main, last } = splitPriceForDisplay(price);
+  const [pressed, setPressed] = useState(false);
 
   return (
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         height: 84,
         borderRadius: 16,
         border: "none",
-        background: isSell ? "#d94141" : "#2d6cdf",
+        background: isSell ? "#D94141" : "#2D6CDF",
         color: "#fff",
-        padding: 9,
+        padding: 8,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
         alignItems: "stretch",
         WebkitTapHighlightColor: "transparent",
+        ...getPressStyle(pressed, false),
       }}
     >
-      <div style={{ fontSize: 18, fontWeight: 800, textAlign: "left" }}>
+      <div style={{ fontSize: 18, fontWeight: 800, textAlign: "left", opacity: 0.95 }}>
         {side}
       </div>
 
@@ -830,7 +969,7 @@ function PriceButton({
             fontSize: 16,
             lineHeight: 1,
             position: "relative",
-            top: -12,
+            top: -10,
             marginLeft: 1,
             display: "inline-block",
           }}
@@ -848,7 +987,7 @@ function SpreadBox({ spread }: { spread: string }) {
       style={{
         height: 42,
         alignSelf: "center",
-        borderRadius: 9,
+        borderRadius: 10,
         border: "1px solid #444",
         background: "#111111",
         padding: 5,
@@ -865,6 +1004,7 @@ function SpreadBox({ spread }: { spread: string }) {
           fontWeight: 800,
           color: "gold",
           lineHeight: 1.1,
+          marginTop: 1,
         }}
       >
         {spread}
@@ -875,36 +1015,34 @@ function SpreadBox({ spread }: { spread: string }) {
 
 function ActionButton({
   label,
+  variant,
   disabled = false,
-  onState = false,
-  purple = false,
-  gold = false,
-  close = false,
   fullWidth = false,
   onClick,
 }: {
   label: string;
+  variant: "off" | "on" | "tpOff" | "dten" | "close";
   disabled?: boolean;
-  onState?: boolean;
-  purple?: boolean;
-  gold?: boolean;
-  close?: boolean;
   fullWidth?: boolean;
   onClick: () => void;
 }) {
-  let background = "#3a3a3a";
+  const [pressed, setPressed] = useState(false);
+
+  let background = "#3A3A3A";
   let color = "#ffffff";
 
-  if (close) {
-    background = "#d4af37";
+  if (variant === "on") {
+    background = "#D94141";
+    color = "#ffffff";
+  } else if (variant === "tpOff") {
+    background = "#9AC932";
     color = "#111111";
-  } else if (onState) {
-    background = "#d94141";
-  } else if (purple) {
-    background = "#7e6bd6";
-  } else if (gold) {
-    background = "#e6dca7";
-    color = "#1a1a1a";
+  } else if (variant === "dten") {
+    background = "#8B5CD6";
+    color = "#ffffff";
+  } else if (variant === "close") {
+    background = "#D4AF37";
+    color = "#111111";
   }
 
   return (
@@ -912,17 +1050,21 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         width: fullWidth ? "100%" : undefined,
-        height: close ? 56 : 46,
-        borderRadius: 16,
+        height: variant === "close" ? 50 : 42,
+        borderRadius: 18,
         border: "none",
         background,
         color: disabled ? "rgba(255,255,255,0.35)" : color,
-        fontSize: close ? 20 : 15,
+        fontSize: variant === "close" ? 18 : 14,
         fontWeight: 800,
-        opacity: disabled ? 0.35 : 1,
         WebkitTapHighlightColor: "transparent",
+        ...getPressStyle(pressed, disabled),
       }}
     >
       {label}
@@ -937,19 +1079,26 @@ function MiniBottomButton({
   label: string;
   onClick: () => void;
 }) {
+  const [pressed, setPressed] = useState(false);
+
   return (
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
-        height: 40,
+        height: 36,
         borderRadius: 12,
         border: "1px solid #444",
         background: "#333333",
         color: "#ffffff",
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 800,
         WebkitTapHighlightColor: "transparent",
+        ...getPressStyle(pressed, false),
       }}
     >
       {label}
