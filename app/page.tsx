@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type PanelKey = "A" | "D";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
+type TunnelStatus = "checking" | "ok" | "ng";
 
 type SlotData = {
   id: SlotKey;
@@ -62,8 +63,6 @@ type BridgeStateResponse = {
   slots: BridgeStateSlot[];
 };
 
-type TunnelStatus = "checking" | "ok" | "ng";
-
 const SLOT_SYMBOLS: Record<SlotKey, string> = {
   S1: "USDJPY+",
   S2: "EURJPY+",
@@ -77,7 +76,7 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
     slots: (["S1", "S2", "S3", "S4"] as SlotKey[]).map((id) => ({
       id,
       symbol: SLOT_SYMBOLS[id],
-      lot: "0.00",
+      lot: "0.01",
       pips: "0.0",
       pl: "0",
       dayPips: "0.0",
@@ -98,6 +97,15 @@ const INITIAL_PANEL_DATA: Record<PanelKey, PanelData> = {
   D: createEmptyPanelData("D"),
 };
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function roundToStepFloor(value: number, step: number) {
+  if (!(step > 0)) return value;
+  return Math.floor(value / step + 1e-10) * step;
+}
+
 function formatSignedNumber(value: number, digits = 1) {
   if (!Number.isFinite(value)) return "0";
   const abs = Math.abs(value).toFixed(digits);
@@ -115,7 +123,7 @@ function formatMoney(value: number) {
 }
 
 function formatLot(value: number) {
-  if (!Number.isFinite(value)) return "0.00";
+  if (!Number.isFinite(value)) return "0.01";
   return value.toFixed(2);
 }
 
@@ -127,12 +135,25 @@ function formatPrice(value: number, digits?: number | null) {
   return String(value);
 }
 
-function formatSpread(value: number, digits?: number | null) {
+function formatSpread(value: number) {
   if (!Number.isFinite(value)) return "0";
-  if (typeof digits === "number" && digits >= 4) {
-    return value.toFixed(1);
-  }
   return value.toFixed(1);
+}
+
+function calcDisplayedLotFromState(item: BridgeStateSlot) {
+  const free = Number(item.free ?? 0);
+  const balance = Number(item.balance ?? 0);
+  const basis = free > 0 ? free : balance;
+
+  if (!(basis > 0)) return "0.01";
+
+  const rawLots = (basis * 2.0) / 100000.0;
+  let lots = clamp(rawLots, 0.01, 300.0);
+  lots = roundToStepFloor(lots, 0.01);
+
+  if (lots < 0.01) lots = 0.01;
+
+  return formatLot(Number(lots.toFixed(2)));
 }
 
 function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateResponse): PanelData {
@@ -143,7 +164,7 @@ function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateRespons
       return {
         id: slotId,
         symbol: SLOT_SYMBOLS[slotId],
-        lot: "0.00",
+        lot: "0.01",
         pips: "0.0",
         pl: "0",
         dayPips: "0.0",
@@ -165,13 +186,13 @@ function mapBridgeStateToPanelData(panel: PanelKey, response: BridgeStateRespons
     return {
       id: slotId,
       symbol: item.symbol || SLOT_SYMBOLS[slotId],
-      lot: formatLot(posLots),
+      lot: calcDisplayedLotFromState(item),
       pips: formatSignedNumber(Number(item.pips ?? 0), 1),
       pl: formatMoney(Number(item.pl ?? 0)),
       dayPips: formatSignedNumber(Number(item.day_pips ?? 0), 1),
       dayPl: formatMoney(Number(item.day_profit ?? 0)),
       buyPrice: formatPrice(Number(item.ask ?? 0), digits),
-      spread: formatSpread(Number(item.spread ?? 0), digits),
+      spread: formatSpread(Number(item.spread ?? 0)),
       sellPrice: formatPrice(Number(item.bid ?? 0), digits),
       hasPosition: posDir !== 0 && posLots > 0,
       guardOn: false,
@@ -272,10 +293,11 @@ export default function Home() {
     if (!audio) return;
 
     try {
-      audio.currentTime = 0;
-      void audio.play();
+      const cloned = audio.cloneNode(true) as HTMLAudioElement;
+      cloned.currentTime = 0;
+      void cloned.play().catch(() => {});
     } catch {
-      // iPhoneの再生制限がある場合は無視
+      // ignore
     }
   }
 
@@ -579,7 +601,7 @@ export default function Home() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1fr",
             gap: 6,
             marginTop: 5,
           }}
@@ -591,10 +613,6 @@ export default function Home() {
           <MiniBottomButton
             label="LINK"
             onClick={() => sendPanelAction("LINK", "LINK")}
-          />
-          <MiniBottomButton
-            label="LOG"
-            onClick={() => sendPanelAction("LOG", "LOG")}
           />
         </div>
       </div>
