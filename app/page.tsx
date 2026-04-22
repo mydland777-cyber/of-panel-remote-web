@@ -178,6 +178,26 @@ function mapBridgeStateToPanelData(
   panel: PanelKey,
   response: BridgeStateResponse
 ): PanelData {
+  const totalPips = response.slots.reduce((sum, item) => {
+    if (!item?.ok) return sum;
+    return sum + Number(item.pips ?? 0);
+  }, 0);
+
+  const totalProfit = response.slots.reduce((sum, item) => {
+    if (!item?.ok) return sum;
+    return sum + Number(item.pl ?? 0);
+  }, 0);
+
+  const totalDayPips = response.slots.reduce((sum, item) => {
+    if (!item?.ok) return sum;
+    return sum + Number(item.day_pips ?? 0);
+  }, 0);
+
+  const totalDayProfit = response.slots.reduce((sum, item) => {
+    if (!item?.ok) return sum;
+    return sum + Number(item.day_profit ?? 0);
+  }, 0);
+
   const mappedSlots: SlotData[] = (["S1", "S2", "S3", "S4"] as SlotKey[]).map((slotId) => {
     const item = response.slots.find((s) => s.slot === slotId);
 
@@ -186,10 +206,10 @@ function mapBridgeStateToPanelData(
         id: slotId,
         symbol: SLOT_SYMBOLS[slotId],
         lot: "0.01",
-        pips: "0.0",
-        pl: "0",
-        dayPips: "0.0",
-        dayPl: "0",
+        pips: formatSignedNumber(totalPips, 1),
+        pl: formatMoney(totalProfit),
+        dayPips: formatSignedNumber(totalDayPips, 1),
+        dayPl: formatMoney(totalDayProfit),
         buyPrice: "0",
         spread: "0",
         sellPrice: "0",
@@ -203,7 +223,9 @@ function mapBridgeStateToPanelData(
     const posLots = Number(item.pos_lots ?? 0);
     const posDir = Number(item.pos_dir ?? 0);
     const digits = item.digits ?? null;
-    const hasPosition = posDir !== 0 && posLots > 0;
+    const hasPosition = response.slots.some(
+      (s) => s?.ok && Number(s.pos_dir ?? 0) !== 0 && Number(s.pos_lots ?? 0) > 0
+    );
 
     return {
       id: slotId,
@@ -212,10 +234,10 @@ function mapBridgeStateToPanelData(
         typeof item.panel_lot === "number" && Number.isFinite(item.panel_lot) && item.panel_lot > 0
           ? formatLot(item.panel_lot)
           : calcDisplayedLotFromState(item),
-      pips: formatSignedNumber(Number(item.pips ?? 0), 1),
-      pl: formatMoney(Number(item.pl ?? 0)),
-      dayPips: formatSignedNumber(Number(item.day_pips ?? 0), 1),
-      dayPl: formatMoney(Number(item.day_profit ?? 0)),
+      pips: formatSignedNumber(totalPips, 1),
+      pl: formatMoney(totalProfit),
+      dayPips: formatSignedNumber(totalDayPips, 1),
+      dayPl: formatMoney(totalDayProfit),
       buyPrice: formatPrice(Number(item.ask ?? 0), digits),
       spread: formatSpread(Number(item.spread ?? 0)),
       sellPrice: formatPrice(Number(item.bid ?? 0), digits),
@@ -421,26 +443,40 @@ export default function Home() {
         return false;
       }
 
-      try {
+      const refreshBridgeState = async () => {
         const bridgeRes = await fetch(`/api/bridge-state?panel=${selectedPanel}`, {
           method: "GET",
           cache: "no-store",
         });
 
-        if (bridgeRes.ok) {
-          const bridgeData = (await bridgeRes.json()) as BridgeStateResponse;
+        if (!bridgeRes.ok) return false;
 
-          if (bridgeData?.ok && Array.isArray(bridgeData.slots)) {
-            setPanelDataMap((prev) => ({
-              ...prev,
-              [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, bridgeData),
-            }));
+        const bridgeData = (await bridgeRes.json()) as BridgeStateResponse;
 
-            setTunnelStatus("ok");
-          }
+        if (!bridgeData?.ok || !Array.isArray(bridgeData.slots)) return false;
+
+        setPanelDataMap((prev) => ({
+          ...prev,
+          [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, bridgeData),
+        }));
+
+        setTunnelStatus("ok");
+        return true;
+      };
+
+      try {
+        if (action === "CLOSE" || action === "RECALC") {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          await refreshBridgeState();
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          await refreshBridgeState();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await refreshBridgeState();
+        } else {
+          await refreshBridgeState();
         }
       } catch {
-        // 即時再取得失敗時は3秒ポーリングに任せる
+        // 失敗時は通常ポーリングに任せる
       }
 
       setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${label}`);
