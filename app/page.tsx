@@ -54,6 +54,7 @@ type BridgeStateSlot = {
   tick_size?: number;
   pip_size?: number;
   commission_side?: number;
+  panel_lot?: number;
   guard_on?: boolean;
   revcut_on?: boolean;
   tp30_on?: boolean;
@@ -207,7 +208,10 @@ function mapBridgeStateToPanelData(
     return {
       id: slotId,
       symbol: item.symbol || SLOT_SYMBOLS[slotId],
-      lot: calcDisplayedLotFromState(item),
+      lot:
+        typeof item.panel_lot === "number" && Number.isFinite(item.panel_lot) && item.panel_lot > 0
+          ? formatLot(item.panel_lot)
+          : calcDisplayedLotFromState(item),
       pips: formatSignedNumber(Number(item.pips ?? 0), 1),
       pl: formatMoney(Number(item.pl ?? 0)),
       dayPips: formatSignedNumber(Number(item.day_pips ?? 0), 1),
@@ -415,6 +419,28 @@ export default function Home() {
         playSound("entry_failed");
         setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${label}`);
         return false;
+      }
+
+      try {
+        const bridgeRes = await fetch(`/api/bridge-state?panel=${selectedPanel}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (bridgeRes.ok) {
+          const bridgeData = (await bridgeRes.json()) as BridgeStateResponse;
+
+          if (bridgeData?.ok && Array.isArray(bridgeData.slots)) {
+            setPanelDataMap((prev) => ({
+              ...prev,
+              [selectedPanel]: mapBridgeStateToPanelData(selectedPanel, bridgeData),
+            }));
+
+            setTunnelStatus("ok");
+          }
+        }
+      } catch {
+        // 即時再取得失敗時は3秒ポーリングに任せる
       }
 
       setLastAction(`送信完了: Panel ${data.panel} / ${data.slot} / ${label}`);
