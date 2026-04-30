@@ -17,6 +17,10 @@ type SlotData = {
   buyPrice: string;
   spread: string;
   sellPrice: string;
+  entryPrice: string;
+  entryTime: string;
+  entryEpochMs: number | null;
+  elapsedSeconds: number | null;
   hasPosition: boolean;
   guardOn: boolean;
   revCutOn: boolean;
@@ -29,6 +33,7 @@ type PanelData = {
 };
 
 type BridgeStateSlot = {
+  [key: string]: unknown;
   slot: SlotKey;
   ok: boolean;
   ts?: number | null;
@@ -88,6 +93,10 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
       buyPrice: "0",
       spread: "0",
       sellPrice: "0",
+      entryPrice: "—",
+      entryTime: "—",
+      entryEpochMs: null,
+      elapsedSeconds: null,
       hasPosition: false,
       guardOn: false,
       revCutOn: false,
@@ -142,6 +151,156 @@ function formatPrice(value: number, digits?: number | null) {
 function formatSpread(value: number) {
   if (!Number.isFinite(value)) return "0";
   return value.toFixed(1);
+}
+
+function toFiniteNumber(value: unknown) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function pickNumberField(item: BridgeStateSlot, names: string[]) {
+  for (const name of names) {
+    const num = toFiniteNumber(item[name]);
+    if (num !== null) return num;
+  }
+  return null;
+}
+
+function pickStringField(item: BridgeStateSlot, names: string[]) {
+  for (const name of names) {
+    const value = item[name];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function normalizeEpochMs(value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  const num = toFiniteNumber(value);
+  if (num === null || num <= 0) return null;
+
+  if (num > 1000000000000) return num;
+  if (num > 1000000000) return num * 1000;
+
+  return null;
+}
+
+function formatClockFromEpochMs(epochMs: number | null) {
+  if (!epochMs) return "—";
+
+  const date = new Date(epochMs);
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hh}:${mm}`;
+}
+
+function formatElapsedSeconds(totalSeconds: number | null) {
+  if (totalSeconds === null || !Number.isFinite(totalSeconds) || totalSeconds < 0) {
+    return "--:--";
+  }
+
+  const seconds = Math.floor(totalSeconds);
+  const minutes = Math.floor(seconds / 60);
+  const restSeconds = seconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(restSeconds).padStart(2, "0")}`;
+}
+
+function getEntryEpochMs(item: BridgeStateSlot) {
+  const fieldNames = [
+    "entry_time",
+    "entryTime",
+    "open_time",
+    "openTime",
+    "pos_time",
+    "posTime",
+    "position_time",
+    "positionTime",
+    "entry_ts",
+    "entryTs",
+    "open_ts",
+    "openTs",
+    "pos_ts",
+    "posTs",
+    "position_ts",
+    "positionTs",
+  ];
+
+  for (const name of fieldNames) {
+    const epochMs = normalizeEpochMs(item[name]);
+    if (epochMs) return epochMs;
+  }
+
+  return null;
+}
+
+function getEntryTimeText(item: BridgeStateSlot, entryEpochMs: number | null) {
+  const text = pickStringField(item, [
+    "entry_time_text",
+    "entryTimeText",
+    "entry_time",
+    "entryTime",
+    "open_time_text",
+    "openTimeText",
+    "open_time",
+    "openTime",
+  ]);
+
+  const timeMatch = text.match(/(\d{1,2}:\d{2})(?::\d{2})?/);
+  if (timeMatch) return timeMatch[1].padStart(5, "0");
+
+  return formatClockFromEpochMs(entryEpochMs);
+}
+
+function getEntryPriceText(item: BridgeStateSlot, digits?: number | null) {
+  const price = pickNumberField(item, [
+    "entry_price",
+    "entryPrice",
+    "open_price",
+    "openPrice",
+    "pos_price",
+    "posPrice",
+    "position_price",
+    "positionPrice",
+    "order_open_price",
+    "orderOpenPrice",
+  ]);
+
+  if (price === null || price <= 0) return "—";
+  return formatPrice(price, digits);
+}
+
+function getElapsedSeconds(item: BridgeStateSlot, entryEpochMs: number | null) {
+  if (entryEpochMs) {
+    return Math.max(0, Math.floor((Date.now() - entryEpochMs) / 1000));
+  }
+
+  const elapsed = pickNumberField(item, [
+    "elapsed_seconds",
+    "elapsedSeconds",
+    "position_elapsed_seconds",
+    "positionElapsedSeconds",
+    "pos_elapsed_seconds",
+    "posElapsedSeconds",
+  ]);
+
+  if (elapsed === null) return null;
+  return Math.max(0, Math.floor(elapsed));
+}
+
+function getDisplayElapsedSeconds(slot: SlotData, nowMs: number) {
+  if (!slot.hasPosition) return null;
+
+  if (slot.entryEpochMs) {
+    return Math.max(0, Math.floor((nowMs - slot.entryEpochMs) / 1000));
+  }
+
+  return slot.elapsedSeconds;
 }
 
 function splitPriceForDisplay(price: string) {
@@ -213,6 +372,10 @@ function mapBridgeStateToPanelData(
         buyPrice: "0",
         spread: "0",
         sellPrice: "0",
+        entryPrice: "—",
+        entryTime: "—",
+        entryEpochMs: null,
+        elapsedSeconds: null,
         hasPosition: false,
         guardOn: false,
         revCutOn: false,
@@ -226,6 +389,10 @@ function mapBridgeStateToPanelData(
     const hasPosition = response.slots.some(
       (s) => s?.ok && Number(s.pos_dir ?? 0) !== 0 && Number(s.pos_lots ?? 0) > 0
     );
+    const entryEpochMs = hasPosition ? getEntryEpochMs(item) : null;
+    const entryPrice = hasPosition ? getEntryPriceText(item, digits) : "—";
+    const entryTime = hasPosition ? getEntryTimeText(item, entryEpochMs) : "—";
+    const elapsedSeconds = hasPosition ? getElapsedSeconds(item, entryEpochMs) : null;
 
     return {
       id: slotId,
@@ -241,6 +408,10 @@ function mapBridgeStateToPanelData(
       buyPrice: formatPrice(Number(item.ask ?? 0), digits),
       spread: formatSpread(Number(item.spread ?? 0)),
       sellPrice: formatPrice(Number(item.bid ?? 0), digits),
+      entryPrice,
+      entryTime,
+      entryEpochMs,
+      elapsedSeconds,
       hasPosition,
       guardOn: Boolean(item.guard_on),
       revCutOn: Boolean(item.revcut_on),
@@ -268,6 +439,7 @@ export default function Home() {
   const [lastAction, setLastAction] = useState("未操作");
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
   const [panelDataMap, setPanelDataMap] = useState<Record<PanelKey, PanelData>>(INITIAL_PANEL_DATA);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
     entry: null,
@@ -284,6 +456,16 @@ export default function Home() {
   const slot = useMemo(() => {
     return panel.slots.find((item) => item.id === selectedSlot) ?? panel.slots[0];
   }, [panel, selectedSlot]);
+
+  const slotElapsed = formatElapsedSeconds(getDisplayElapsedSeconds(slot, nowMs));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     audioRef.current.entry = new Audio("/entry.wav");
@@ -578,6 +760,27 @@ export default function Home() {
           }}
         >
           {panel.title} / {slot.id}
+        </div>
+
+        <div
+          style={{
+            background: "#171717",
+            border: "1px solid #333333",
+            borderRadius: 10,
+            padding: "6px 10px",
+            marginBottom: 5,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 8,
+            alignItems: "center",
+            fontSize: 14,
+            fontWeight: 800,
+            color: slot.hasPosition ? "#ffffff" : "#8b8b8b",
+          }}
+        >
+          <div style={{ textAlign: "left" }}>{slot.entryPrice}</div>
+          <div style={{ textAlign: "center" }}>{slot.entryTime}</div>
+          <div style={{ textAlign: "right" }}>[{slotElapsed}]</div>
         </div>
 
         <div
