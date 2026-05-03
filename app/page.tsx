@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type PanelKey = "A" | "D";
+type PanelKey = "A";
 type SlotKey = "S1" | "S2" | "S3" | "S4";
 type TunnelStatus = "checking" | "ok" | "ng";
 
@@ -107,7 +107,6 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
 
 const INITIAL_PANEL_DATA: Record<PanelKey, PanelData> = {
   A: createEmptyPanelData("A"),
-  D: createEmptyPanelData("D"),
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -138,6 +137,24 @@ function formatMoney(value: number) {
 function formatLot(value: number) {
   if (!Number.isFinite(value)) return "0.01";
   return value.toFixed(2);
+}
+
+function normalizeLotValue(value: number) {
+  let lots = clamp(value, 0.01, 300.0);
+  lots = roundToStepFloor(lots, 0.01);
+
+  if (lots < 0.01) lots = 0.01;
+
+  return Number(lots.toFixed(2));
+}
+
+function parseLotInput(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  const num = Number(normalized);
+
+  if (!Number.isFinite(num)) return null;
+
+  return normalizeLotValue(num);
 }
 
 function formatPrice(value: number, digits?: number | null) {
@@ -434,12 +451,14 @@ function getPressStyle(pressed: boolean, disabled = false) {
 }
 
 export default function Home() {
-  const [selectedPanel, setSelectedPanel] = useState<PanelKey>("A");
+  const selectedPanel: PanelKey = "A";
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("S1");
   const [lastAction, setLastAction] = useState("未操作");
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("checking");
   const [panelDataMap, setPanelDataMap] = useState<Record<PanelKey, PanelData>>(INITIAL_PANEL_DATA);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [lotEditorOpen, setLotEditorOpen] = useState(false);
+  const [lotEditorValue, setLotEditorValue] = useState("0.01");
 
   const audioRef = useRef<Record<string, HTMLAudioElement | null>>({
     entry: null,
@@ -458,6 +477,10 @@ export default function Home() {
   }, [panel, selectedSlot]);
 
   const slotElapsed = formatElapsedSeconds(getDisplayElapsedSeconds(slot, nowMs));
+  const openLotEditor = () => {
+    setLotEditorValue(slot.lot || "0.01");
+    setLotEditorOpen(true);
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -582,12 +605,6 @@ export default function Home() {
     }
   }
 
-  function selectPanel(panelKey: PanelKey) {
-    setSelectedPanel(panelKey);
-    setSelectedSlot("S1");
-    setLastAction(`Panel ${panelKey} を選択`);
-  }
-
   function selectSlot(slotId: SlotKey) {
     setSelectedSlot(slotId);
     setLastAction(`Panel ${selectedPanel} / ${slotId} を選択`);
@@ -596,9 +613,12 @@ export default function Home() {
   async function sendPanelAction(
     action: string,
     label: string,
-    sound?: keyof typeof audioRef.current
+    sound?: keyof typeof audioRef.current,
+    targetSlot?: SlotKey
   ) {
-    setLastAction(`送信中: Panel ${selectedPanel} / ${slot.id} / ${label}`);
+    const sendSlot = targetSlot ?? slot.id;
+
+    setLastAction(`送信中: Panel ${selectedPanel} / ${sendSlot} / ${label}`);
 
     if (sound) {
       playSound(sound);
@@ -612,7 +632,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           panel: selectedPanel,
-          slot: slot.id,
+          slot: sendSlot,
           action,
         }),
       });
@@ -621,7 +641,7 @@ export default function Home() {
 
       if (!res.ok || !data?.ok) {
         playSound("entry_failed");
-        setLastAction(`送信失敗: Panel ${selectedPanel} / ${slot.id} / ${label}`);
+        setLastAction(`送信失敗: Panel ${selectedPanel} / ${sendSlot} / ${label}`);
         return false;
       }
 
@@ -665,7 +685,7 @@ export default function Home() {
       return true;
     } catch {
       playSound("entry_failed");
-      setLastAction(`通信エラー: Panel ${selectedPanel} / ${slot.id} / ${label}`);
+      setLastAction(`通信エラー: Panel ${selectedPanel} / ${sendSlot} / ${label}`);
       return false;
     }
   }
@@ -684,6 +704,33 @@ export default function Home() {
     if (!slot.hasPosition) return;
     await sendPanelAction(slot.tp30On ? "TP30_OFF" : "TP30", "TP+30", "tp30");
   }
+
+  const applyManualLot = async () => {
+    const nextLot = parseLotInput(lotEditorValue);
+
+    if (nextLot == null) {
+      return;
+    }
+
+    const lotText = formatLot(nextLot);
+
+    setLotEditorValue(lotText);
+    setLotEditorOpen(false);
+
+    await sendPanelAction(
+      `LOT_SYNC_ALL:${lotText}`,
+      "LOT",
+      undefined,
+      "S1"
+    );
+  };
+
+  const adjustLotEditorValue = (delta: number) => {
+    const current = parseLotInput(lotEditorValue) ?? parseLotInput(slot.lot) ?? 0.01;
+    const next = normalizeLotValue(current + delta);
+
+    setLotEditorValue(formatLot(next));
+  };
 
   return (
     <main
@@ -726,26 +773,6 @@ export default function Home() {
             : tunnelStatus === "ng"
               ? "NG"
               : "CHECKING"}
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 6,
-            marginBottom: 3,
-          }}
-        >
-          <TopTab
-            label="PANEL A"
-            active={selectedPanel === "A"}
-            onClick={() => selectPanel("A")}
-          />
-          <TopTab
-            label="PANEL D"
-            active={selectedPanel === "D"}
-            onClick={() => selectPanel("D")}
-          />
         </div>
 
         <div
@@ -842,20 +869,24 @@ export default function Home() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{ opacity: 0.9, fontSize: 13 }}>Lot</div>
-              <div
+              <button
+                type="button"
+                onClick={openLotEditor}
                 style={{
                   minWidth: 58,
                   textAlign: "center",
                   padding: "4px 8px",
                   background: "#111111",
-                  border: "1px solid #444",
+                  color: "#ffffff",
+                  border: "1px solid #666",
                   borderRadius: 7,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   fontSize: 15,
+                  WebkitTapHighlightColor: "transparent",
                 }}
               >
                 {slot.lot}
-              </div>
+              </button>
             </div>
           </div>
 
@@ -924,6 +955,32 @@ export default function Home() {
             }}
           >
             <ActionButton
+              label="T SELL"
+              variant="tSell"
+              disabled={slot.hasPosition}
+              onClick={() => {
+                void sendPanelAction("T SELL", "T SELL");
+              }}
+            />
+            <ActionButton
+              label="T BUY"
+              variant="tBuy"
+              disabled={slot.hasPosition}
+              onClick={() => {
+                void sendPanelAction("T BUY", "T BUY");
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 6,
+              marginBottom: 5,
+            }}
+          >
+            <ActionButton
               label="TP+30"
               variant={slot.tp30On ? "on" : "tpOff"}
               disabled={!slot.hasPosition}
@@ -977,48 +1034,115 @@ export default function Home() {
           <MiniBottomButton
             label="再計算"
             onClick={() => {
+              setLotEditorOpen(false);
+              setLotEditorValue("0.01");
               void sendPanelAction("RECALC", "再計算");
             }}
           />
         </div>
       </div>
+
+      {lotEditorOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(0,0,0,0.65)",
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: "min(360px, 100%)",
+              background: "#242424",
+              border: "1px solid #555",
+              borderRadius: 14,
+              padding: 14,
+              boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 900,
+                marginBottom: 10,
+              }}
+            >
+              Lot編集 / {slot.id}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              <MiniBottomButton label="-10" onClick={() => adjustLotEditorValue(-10)} />
+              <MiniBottomButton label="-1" onClick={() => adjustLotEditorValue(-1)} />
+              <MiniBottomButton label="-0.1" onClick={() => adjustLotEditorValue(-0.1)} />
+            </div>
+
+            <input
+              value={lotEditorValue}
+              inputMode="decimal"
+              onChange={(e) => setLotEditorValue(e.target.value)}
+              style={{
+                width: "100%",
+                height: 46,
+                boxSizing: "border-box",
+                textAlign: "center",
+                background: "#111",
+                color: "#fff",
+                border: "1px solid #666",
+                borderRadius: 10,
+                fontSize: 24,
+                fontWeight: 900,
+                marginBottom: 8,
+              }}
+            />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 6,
+                marginBottom: 10,
+              }}
+            >
+              <MiniBottomButton label="+0.1" onClick={() => adjustLotEditorValue(0.1)} />
+              <MiniBottomButton label="+1" onClick={() => adjustLotEditorValue(1)} />
+              <MiniBottomButton label="+10" onClick={() => adjustLotEditorValue(10)} />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              <MiniBottomButton
+                label="閉じる"
+                onClick={() => {
+                  setLotEditorOpen(false);
+                }}
+              />
+              <MiniBottomButton
+                label="反映"
+                onClick={() => {
+                  void applyManualLot();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
-  );
-}
-
-function TopTab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const [pressed, setPressed] = useState(false);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        height: 30,
-        borderRadius: 12,
-        border: "1px solid #444",
-        background: active ? "#2d6cdf" : "#333333",
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 800,
-        WebkitTapHighlightColor: "transparent",
-        ...getPressStyle(pressed, false),
-      }}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -1213,7 +1337,7 @@ function ActionButton({
   onClick,
 }: {
   label: string;
-  variant: "off" | "on" | "tpOff" | "dten" | "close";
+  variant: "off" | "on" | "tpOff" | "dten" | "close" | "tSell" | "tBuy";
   disabled?: boolean;
   fullWidth?: boolean;
   onClick: () => void;
@@ -1235,6 +1359,12 @@ function ActionButton({
   } else if (variant === "close") {
     background = "#D4AF37";
     color = "#111111";
+  } else if (variant === "tSell") {
+    background = "#9B4A7A";
+    color = "#ffffff";
+  } else if (variant === "tBuy") {
+    background = "#2F8F7B";
+    color = "#ffffff";
   }
 
   return (
