@@ -25,6 +25,8 @@ type SlotData = {
   guardOn: boolean;
   revCutOn: boolean;
   tp30On: boolean;
+  tbuyOn: boolean;
+  tsellOn: boolean;
 };
 
 type PanelData = {
@@ -63,6 +65,8 @@ type BridgeStateSlot = {
   guard_on?: boolean;
   revcut_on?: boolean;
   tp30_on?: boolean;
+  tbuy_on?: boolean;
+  tsell_on?: boolean;
 };
 
 type BridgeStateResponse = {
@@ -101,6 +105,8 @@ function createEmptyPanelData(panel: PanelKey): PanelData {
       guardOn: false,
       revCutOn: false,
       tp30On: false,
+      tbuyOn: false,
+      tsellOn: false,
     })),
   };
 }
@@ -397,6 +403,8 @@ function mapBridgeStateToPanelData(
         guardOn: false,
         revCutOn: false,
         tp30On: false,
+        tbuyOn: false,
+        tsellOn: false,
       };
     }
 
@@ -433,6 +441,8 @@ function mapBridgeStateToPanelData(
       guardOn: Boolean(item.guard_on),
       revCutOn: Boolean(item.revcut_on),
       tp30On: Boolean(item.tp30_on),
+      tbuyOn: Boolean(item.tbuy_on),
+      tsellOn: Boolean(item.tsell_on),
     };
   });
 
@@ -956,7 +966,7 @@ export default function Home() {
           >
             <ActionButton
               label="T SELL"
-              variant="tSell"
+              variant={slot.tsellOn ? "on" : "tSell"}
               disabled={slot.hasPosition}
               onClick={() => {
                 void sendPanelAction("T SELL", "T SELL");
@@ -964,7 +974,7 @@ export default function Home() {
             />
             <ActionButton
               label="T BUY"
-              variant="tBuy"
+              variant={slot.tbuyOn ? "on" : "tBuy"}
               disabled={slot.hasPosition}
               onClick={() => {
                 void sendPanelAction("T BUY", "T BUY");
@@ -1114,15 +1124,15 @@ export default function Home() {
                 marginBottom: 10,
               }}
             >
-              <MiniBottomButton label="+0.1" onClick={() => adjustLotEditorValue(0.1)} />
-              <MiniBottomButton label="+1" onClick={() => adjustLotEditorValue(1)} />
               <MiniBottomButton label="+10" onClick={() => adjustLotEditorValue(10)} />
+              <MiniBottomButton label="+1" onClick={() => adjustLotEditorValue(1)} />
+              <MiniBottomButton label="+0.1" onClick={() => adjustLotEditorValue(0.1)} />
             </div>
 
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: "1fr 1fr 1fr",
                 gap: 8,
               }}
             >
@@ -1130,6 +1140,14 @@ export default function Home() {
                 label="閉じる"
                 onClick={() => {
                   setLotEditorOpen(false);
+                }}
+              />
+              <MiniBottomButton
+                label="1/2"
+                onClick={() => {
+                  const current = parseLotInput(lotEditorValue) ?? parseLotInput(slot.lot) ?? 0.01;
+                  const next = normalizeLotValue(current / 2);
+                  setLotEditorValue(formatLot(next));
                 }}
               />
               <MiniBottomButton
